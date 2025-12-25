@@ -1,0 +1,11 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Base.Theme.Tasks" parent="Theme.Material3.DayNight.NoActionBar">
+
+        <item name="colorPrimary">@color/primary_color</item>
+        <item name="android:windowBackground">@color/dark_background</item>
+
+        <item name="android:statusBarColor">@color/dark_background</item>
+    </style>
+
+    <style name="Theme.Tasks" parent="Base.Theme.Tasks" />
+</resources>

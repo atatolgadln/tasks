@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/tvHeader"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="Başlık"
+    android:textColor="#BB86FC"
+    android:textSize="13sp"
+    android:textStyle="bold"
+    android:textAllCaps="true"
+    android:letterSpacing="0.05"
+    android:paddingBottom="4dp"/>

@@ -1,0 +1,41 @@
+<resources>
+    <string name="app_name">Tasks</string>
+    <string name="main_title">Tasks</string>
+    <string name="header_morning">☀️ Morning</string>
+    <string name="header_evening">🌙 Evening</string>
+
+    <string name="dialog_add_title">Add New Task</string>
+    <string name="hint_task_name">Task Name</string>
+    <string name="label_time_selection">Time Selection (Select both if needed)</string>
+    <string name="time_morning">Morning</string>
+    <string name="time_evening">Evening</string>
+    <string name="label_repeat_every">Repeat every (Frequency)</string>
+    <string name="label_repeat_for">Repeat for</string>
+    <string name="label_times">times</string>
+    <string name="hint_total_times_short">Total? (Empty=∞)</string>
+    <string name="btn_add">Add</string>
+    <string name="btn_cancel">Cancel</string>
+
+    <string name="status_remaining_fmt">Remaining: %1$d</string>
+    <string name="status_infinite">∞ Always</string>
+    <string name="widget_details_fmt">Rem: %1$s • Every %2$d %3$s</string>
+    <string name="widget_details_infinite_fmt">∞ Always • Every %1$d %2$s</string>
+
+    <string name="toast_select_time">Please select at least one time.</string>
+    <string name="toast_missing_fields">Task name and frequency are required.</string>
+
+    <string-array name="units_array">
+        <item>Day</item>
+        <item>Week</item>
+        <item>Month</item>
+    </string-array>
+
+    <string name="dialog_delete_title">Delete Task?</string>
+    <string name="dialog_delete_message">Are you sure you want to delete "%1$s"?</string>
+    <string name="btn_delete">Delete</string>
+
+    <string name="msg_empty_state">No tasks for today!\nEnjoy your day 🎉</string>
+
+    <string name="dialog_edit_title">Edit Task</string>
+    <string name="btn_save">Save</string>
+</resources>
