@@ -1,6 +1,5 @@
 package com.whattyu.tasks.ui
 
-import android.graphics.Color
 import android.graphics.Paint
 import android.view.LayoutInflater
 import android.view.View
@@ -14,33 +13,8 @@ import com.whattyu.tasks.databinding.ItemIlacBinding
 
 class IlacAdapter(
     private val onIlacClick: (IlacGorev, Boolean) -> Unit,
-    private val onIlacLongClick: () -> Unit,
-    private val onIlacEditClick: (IlacGorev) -> Unit, // YENİ: Düzenleme için tıklama
-    private val onSelectionChanged: (Boolean) -> Unit
+    private val onIlacLongClick: (IlacGorev, View) -> Unit
 ) : ListAdapter<IlacGorev, IlacAdapter.IlacViewHolder>(DiffCallback()) {
-
-    // SEÇİM MODU DEĞİŞKENLERİ
-    var isSelectionMode = false
-    val selectedItems = HashSet<Int>() // Seçilenlerin ID'lerini tutar
-
-    // Modu Aç/Kapat
-    fun setSelectionModeEnabled(enabled: Boolean) {
-        isSelectionMode = enabled
-        if (!enabled) selectedItems.clear()
-        notifyDataSetChanged()
-    }
-
-    // Tümünü Seç (İsteğe bağlı)
-    fun selectAll() {
-        currentList.forEach { selectedItems.add(it.id) }
-        notifyDataSetChanged()
-        onSelectionChanged(selectedItems.isNotEmpty())
-    }
-
-    // Seçilenleri Getir (Silmek için)
-    fun getSelectedTasks(): List<IlacGorev> {
-        return currentList.filter { selectedItems.contains(it.id) }
-    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): IlacViewHolder {
         val binding = ItemIlacBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -65,64 +39,22 @@ class IlacAdapter(
                 binding.tvDozBilgi.text = context.getString(R.string.status_remaining_fmt, ilac.kalanDoz)
             }
 
-            // GÖRSEL AYARLAR
-            if (isSelectionMode) {
-                // SEÇİM MODUNDAYSA:
-                binding.cbTamamlandi.visibility = View.GONE // Checkbox'ı gizle
+            binding.cbTamamlandi.setOnCheckedChangeListener(null)
+            binding.cbTamamlandi.isChecked = ilac.seciliMi
 
-                if (selectedItems.contains(ilac.id)) {
-                    // Seçiliyse morumsu arka plan yap
-                    binding.root.setCardBackgroundColor(Color.parseColor("#33BB86FC"))
-                    binding.root.strokeWidth = 4
-                } else {
-                    // Seçili değilse normal
-                    binding.root.setCardBackgroundColor(Color.parseColor("#1E1E1E"))
-                    binding.root.strokeWidth = 0
-                }
-
-                // Tıklanınca Seç/Bırak
-                binding.root.setOnClickListener {
-                    if (selectedItems.contains(ilac.id)) {
-                        selectedItems.remove(ilac.id)
-                    } else {
-                        selectedItems.add(ilac.id)
-                    }
-                    notifyItemChanged(adapterPosition)
-                    onSelectionChanged(selectedItems.isNotEmpty())
-                }
-
+            binding.tvIlacIsim.paintFlags = if (ilac.seciliMi) {
+                binding.tvIlacIsim.paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
             } else {
-                // NORMAL MODDAYSA:
-                binding.cbTamamlandi.visibility = View.VISIBLE
-                binding.root.setCardBackgroundColor(Color.parseColor("#1E1E1E"))
-                binding.root.strokeWidth = 0
+                binding.tvIlacIsim.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
+            }
 
-                binding.cbTamamlandi.setOnCheckedChangeListener(null)
-                binding.cbTamamlandi.isChecked = ilac.seciliMi
+            binding.cbTamamlandi.setOnCheckedChangeListener { _, isChecked ->
+                onIlacClick(ilac, isChecked)
+            }
 
-                binding.tvIlacIsim.paintFlags = if (ilac.seciliMi) {
-                    binding.tvIlacIsim.paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
-                } else {
-                    binding.tvIlacIsim.paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
-                }
-
-                binding.cbTamamlandi.setOnCheckedChangeListener { _, isChecked ->
-                    onIlacClick(ilac, isChecked)
-                }
-
-                binding.root.setOnClickListener {
-                    onIlacEditClick(ilac)
-                }
-
-                // Basılı Tutunca Modu Aç
-                binding.root.setOnLongClickListener {
-                    onIlacLongClick() // Activity'e haber ver
-                    selectedItems.add(ilac.id) // Basılanı direkt seç
-                    true
-                }
-
-                // Normal tıklama bir şey yapmasın (Checkbox hallediyor)
-                binding.root.setOnClickListener(null)
+            binding.root.setOnLongClickListener {
+                onIlacLongClick(ilac, binding.root)
+                true
             }
         }
     }

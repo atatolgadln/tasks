@@ -7,83 +7,84 @@ import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.whattyu.tasks.data.IlacDatabase
 import com.whattyu.tasks.data.IlacGorev
+import com.whattyu.tasks.data.IlacRepository
+import com.whattyu.tasks.widget.IlacWidgetProvider
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.Dispatchers
-import com.whattyu.tasks.widget.IlacWidgetProvider
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 
 class IlacViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val ilacDao = IlacDatabase.getDatabase(application).ilacDao()
+    private val repository: IlacRepository
 
-    val sabahGorevleri: LiveData<List<IlacGorev>> = ilacDao.getSabahGorevleri()
-        .map { liste -> liste.filter { gorevGosterilmeliMi(it) } }
-        .asLiveData()
-
-    val aksamGorevleri: LiveData<List<IlacGorev>> = ilacDao.getAksamGorevleri()
-        .map { liste -> liste.filter { gorevGosterilmeliMi(it) } }
-        .asLiveData()
-
-    val digerGorevleri: LiveData<List<IlacGorev>> = ilacDao.getDigerGorevleri()
-        .map { liste -> liste.filter { gorevGosterilmeliMi(it) } }
-        .asLiveData()
+    // Formatter for database date strings (yyyy-MM-dd)
+    private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
     init {
+        val dao = IlacDatabase.getDatabase(application).ilacDao()
+        repository = IlacRepository(dao)
         gunlukTemizlikYap()
     }
 
-    private fun widgetiTetikle() {
-        IlacWidgetProvider.widgetlariGuncelle(getApplication())
-    }
+    val sabahGorevleri: LiveData<List<IlacGorev>> = repository.sabahGorevleri
+        .map { list -> list.filter { shouldShowTask(it) } }
+        .asLiveData()
 
-    private fun gorevGosterilmeliMi(ilac: IlacGorev): Boolean {
-        if (ilac.sonIslemTarihi == null) return true
+    val aksamGorevleri: LiveData<List<IlacGorev>> = repository.aksamGorevleri
+        .map { list -> list.filter { shouldShowTask(it) } }
+        .asLiveData()
 
-        val bugun = bugununTarihi()
+    val digerGorevleri: LiveData<List<IlacGorev>> = repository.digerGorevleri
+        .map { list -> list.filter { shouldShowTask(it) } }
+        .asLiveData()
 
-        if (ilac.sonIslemTarihi == bugun) return true
+    /**
+     * Determines if a task should be visible today based on its interval.
+     */
+    private fun shouldShowTask(ilac: IlacGorev): Boolean {
+        // 1. If never processed, show it.
+        val lastDateStr = ilac.sonIslemTarihi ?: return true
 
-        val format = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         try {
-            val sonTarih = format.parse(ilac.sonIslemTarihi!!)
-            val bugunDate = format.parse(bugun) ?: return true
+            val today = LocalDate.now()
+            val lastDate = LocalDate.parse(lastDateStr, dateFormatter)
 
-            val farkMillis = bugunDate.time - sonTarih!!.time
-            val gecenGun = TimeUnit.MILLISECONDS.toDays(farkMillis)
+            // 2. If processed today, keep showing it (so the user sees it's done/checked)
+            if (lastDate.isEqual(today)) return true
 
-            val hedefGun = when (ilac.tekrarBirimi) {
-                "Hafta", "Week" -> ilac.tekrarAraligi * 7
-                "Ay", "Month" -> ilac.tekrarAraligi * 30
-                else -> ilac.tekrarAraligi // "Gün", "Day"
+            // 3. Calculate interval in days
+            val daysPassed = ChronoUnit.DAYS.between(lastDate, today)
+
+            val intervalDays = when (ilac.tekrarBirimi) {
+                "Hafta", "Week" -> ilac.tekrarAraligi * 7L
+                "Ay", "Month" -> ilac.tekrarAraligi * 30L
+                else -> ilac.tekrarAraligi.toLong() // "Gün", "Day"
             }
 
-            return gecenGun >= hedefGun
+            // 4. Show only if enough time has passed
+            return daysPassed >= intervalDays
 
         } catch (e: Exception) {
-            return true
+            e.printStackTrace()
+            return true // Fail safe: show task if date parsing fails
         }
-    }
-
-    private fun bugununTarihi(): String {
-        return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
     }
 
     private fun gunlukTemizlikYap() = viewModelScope.launch(Dispatchers.IO) {
-        val bugun = bugununTarihi()
+        val todayStr = LocalDate.now().format(dateFormatter)
+        val widgetList = repository.getWidgetListesi()
 
-        val widgetListesi = ilacDao.getWidgetListesi()
-
-        widgetListesi.forEach { ilac ->
-            if (ilac.seciliMi && ilac.sonIslemTarihi != bugun) {
+        // Uncheck items that were checked on previous days
+        widgetList.forEach { ilac ->
+            if (ilac.seciliMi && ilac.sonIslemTarihi != todayStr) {
                 ilac.seciliMi = false
-                ilacDao.ilacGuncelle(ilac)
+                repository.update(ilac)
             }
         }
-        widgetiTetikle()
+        updateWidgets()
     }
 
     fun ekle(isim: String, zaman: String, aralik: Int, birim: String, toplamTekrar: Int) = viewModelScope.launch {
@@ -95,41 +96,46 @@ class IlacViewModel(application: Application) : AndroidViewModel(application) {
             tekrarBirimi = birim,
             sonIslemTarihi = null
         )
-        ilacDao.ilacEkle(yeniIlac)
-        widgetiTetikle()
-    }
-
-    fun guncelle(ilac: IlacGorev) = viewModelScope.launch(Dispatchers.IO) {
-        ilacDao.ilacGuncelle(ilac)
-        com.whattyu.tasks.widget.IlacWidgetProvider.widgetlariGuncelle(getApplication())
+        repository.insert(yeniIlac)
+        updateWidgets()
     }
 
     fun ilacDurumunuGuncelle(ilac: IlacGorev, isChecked: Boolean) = viewModelScope.launch {
+        val todayStr = LocalDate.now().format(dateFormatter)
         val guncelIlac = ilac.copy(seciliMi = isChecked)
-        val bugun = bugununTarihi()
 
         if (isChecked) {
+            // Checked: Decrease dose, update date
             if (guncelIlac.kalanDoz != -1) guncelIlac.kalanDoz -= 1
-            guncelIlac.sonIslemTarihi = bugun
+            guncelIlac.sonIslemTarihi = todayStr
         } else {
+            // Unchecked: Increase dose back (undo)
             if (guncelIlac.kalanDoz != -1) guncelIlac.kalanDoz += 1
+            // Note: We don't revert the date to null because we want to know it was interacted with recently,
+            // but if you strictly want to undo date, you'd need the previous date logic.
+            // Keeping date as todayStr is safer to prevent it from disappearing if 'shouldShowTask' relies on it.
         }
 
         if (guncelIlac.kalanDoz != -1 && guncelIlac.kalanDoz <= 0) {
-            ilacDao.ilacSil(guncelIlac)
+            repository.delete(guncelIlac)
         } else {
-            ilacDao.ilacGuncelle(guncelIlac)
+            repository.update(guncelIlac)
         }
-        widgetiTetikle()
-    }
-
-    fun topluSil(silinecekler: List<IlacGorev>) = viewModelScope.launch {
-        silinecekler.forEach { ilacDao.ilacSil(it) }
-        widgetiTetikle()
+        updateWidgets()
     }
 
     fun sil(ilac: IlacGorev) = viewModelScope.launch {
-        ilacDao.ilacSil(ilac)
-        widgetiTetikle()
+        repository.delete(ilac)
+        updateWidgets()
+    }
+
+    private fun updateWidgets() {
+        IlacWidgetProvider.widgetlariGuncelle(getApplication())
+    }
+
+    // IlacViewModel.kt içine ekle:
+    suspend fun getGorevById(id: Int): IlacGorev? {
+        return repository.getGorevById(id)
+        // Eğer repository'de yoksa, IlacDao'daki getIlacById fonksiyonunu repository'e ekle.
     }
 }

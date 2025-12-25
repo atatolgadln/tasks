@@ -1,6 +1,5 @@
 package com.whattyu.tasks
 
-import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import androidx.activity.viewModels
@@ -9,6 +8,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.whattyu.tasks.databinding.ActivityMainBinding
 import com.whattyu.tasks.ui.IlacAdapter
 import com.whattyu.tasks.ui.IlacViewModel
+import android.widget.PopupMenu
+import com.whattyu.tasks.ui.IlacEkleDialog
 
 class MainActivity : AppCompatActivity() {
 
@@ -20,43 +21,23 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Sabah Listesi Ayarları
         val sabahAdapter = createAdapter()
         binding.rvSabah.layoutManager = LinearLayoutManager(this)
         binding.rvSabah.adapter = sabahAdapter
 
-        // Akşam Listesi Ayarları
         val aksamAdapter = createAdapter()
         binding.rvAksam.layoutManager = LinearLayoutManager(this)
         binding.rvAksam.adapter = aksamAdapter
 
-        // --- YENİ EKLENEN KISIM: Diğer/Her Zaman Listesi ---
-        // XML'inizde rvDiger adında bir RecyclerView olmalı
-        // Eğer yoksa activity_main.xml'e eklemelisiniz.
-        val digerAdapter = createAdapter()
-        // binding.rvDiger.layoutManager = LinearLayoutManager(this) // XML'de rvDiger varsa açın
-        // binding.rvDiger.adapter = digerAdapter                   // XML'de rvDiger varsa açın
-
         viewModel.sabahGorevleri.observe(this) { list ->
             sabahAdapter.submitList(list)
-            binding.tvHeaderMorning.visibility = if (list.isNotEmpty()) View.VISIBLE else View.GONE
+            binding.tvBaslikSabah.visibility = if (list.isNotEmpty()) View.VISIBLE else View.GONE
             updateEmptyView()
         }
 
         viewModel.aksamGorevleri.observe(this) { list ->
             aksamAdapter.submitList(list)
-            binding.tvHeaderEvening.visibility = if (list.isNotEmpty()) View.VISIBLE else View.GONE
-            updateEmptyView()
-        }
-
-        // --- YENİ EKLENEN KISIM: Diğer Listeyi Gözlemleme ---
-        viewModel.digerGorevleri.observe(this) { list ->
-            digerAdapter.submitList(list)
-
-            // Başlık ve Liste görünürlüğünü kontrol et (XML id'lerine göre düzenleyin)
-            // binding.tvHeaderOther.visibility = if (list.isNotEmpty()) View.VISIBLE else View.GONE
-            // binding.rvDiger.visibility = if (list.isNotEmpty()) View.VISIBLE else View.GONE
-
+            binding.tvBaslikAksam.visibility = if (list.isNotEmpty()) View.VISIBLE else View.GONE
             updateEmptyView()
         }
 
@@ -66,26 +47,50 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // --- Yardımcı Fonksiyonlar ---
+
     private fun createAdapter(): IlacAdapter {
         return IlacAdapter(
-            onCheckChanged = { ilac, isChecked ->
+            onIlacClick = { ilac, isChecked ->
                 viewModel.ilacDurumunuGuncelle(ilac, isChecked)
             },
-            onDeleteClick = { ilac ->
-                viewModel.sil(ilac)
+            onIlacLongClick = { ilac, view ->
+                showTaskMenu(ilac, view)
             }
         )
     }
 
-    private fun updateEmptyView() {
-        // val isSabahEmpty = viewModel.sabahGorevleri.value.isNullOrEmpty()
-        // val isAksamEmpty = viewModel.aksamGorevleri.value.isNullOrEmpty()
-        // val isDigerEmpty = viewModel.digerGorevleri.value.isNullOrEmpty()
+    private fun showTaskMenu(ilac: com.whattyu.tasks.data.IlacGorev, view: View) {
+        val popup = PopupMenu(this, view)
+        // Menü elemanlarını kodla ekliyoruz
+        popup.menu.add(0, 1, 0, getString(R.string.menu_edit)) // "Düzenle"
+        popup.menu.add(0, 2, 1, getString(R.string.menu_delete)) // "Sil"
 
-        // if (isSabahEmpty && isAksamEmpty && isDigerEmpty) {
-        //     binding.emptyView.visibility = View.VISIBLE
-        // } else {
-        //     binding.emptyView.visibility = View.GONE
-        // }
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                1 -> { // Düzenle
+                    val dialog = IlacEkleDialog.newInstance(ilac.id)
+                    dialog.show(supportFragmentManager, "IlacDuzenleDialog")
+                    true
+                }
+                2 -> { // Sil
+                    viewModel.sil(ilac)
+                    true
+                }
+                else -> false
+            }
+        }
+        popup.show()
+    }
+
+    private fun updateEmptyView() {
+        val isSabahEmpty = viewModel.sabahGorevleri.value.isNullOrEmpty()
+        val isAksamEmpty = viewModel.aksamGorevleri.value.isNullOrEmpty()
+
+        if (isSabahEmpty && isAksamEmpty) {
+            binding.layoutEmptyState.visibility = View.VISIBLE
+        } else {
+            binding.layoutEmptyState.visibility = View.GONE
+        }
     }
 }

@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface IlacDao {
 
+    @Query("SELECT * FROM ilac_tablosu WHERE isim = :isim") // Tablo adın farklıysa düzelt
+    suspend fun ayniIsimliGorevleriGetir(isim: String): List<IlacGorev>
     @Query("SELECT * FROM ilac_tablosu WHERE zamanDilimi NOT IN ('Sabah', 'Akşam') ORDER BY seciliMi ASC")
     fun getDigerGorevleri(): Flow<List<IlacGorev>>
     @Query("SELECT * FROM ilac_tablosu WHERE zamanDilimi = 'Sabah' ORDER BY seciliMi ASC")

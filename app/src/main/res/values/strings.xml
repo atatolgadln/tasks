@@ -38,4 +38,8 @@
 
     <string name="dialog_edit_title">Edit Task</string>
     <string name="btn_save">Save</string>
+
+    <string name="menu_edit">Edit</string>
+    <string name="menu_delete">Delete</string>
+    <string name="btn_update">Update</string>
 </resources>
